@@ -1,37 +1,46 @@
+import telebot
 from rembg import remove
 from PIL import Image
+import io
 import os
 
-# --- الإعدادات ---
-input_file = 'test.png'  # تأكدت باللي السمية والصيغة صحيحة (png)
-output_file = 'result_no_bg.png'
+# الساروت ديالك اللي عطيتي ليا
+TOKEN = '8238787092:AAHPlHZeE3woH2t-q14LUYhg8AynYD2aX1E'
 
-def start_engine():
-    # 1. التشييك واش الصورة كاينة بصح
-    if not os.path.exists(input_file):
-        print(f"❌ خطأ: مالقيتش الملف '{input_file}' وسط الدوسي EasyREMB.")
-        return
+bot = telebot.TeleBot(TOKEN)
 
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "مرحباً يا جمال! صيفط ليا دابا أي صورة وغادي نحيد ليها الخلفية في ثانية. 🚀")
+
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
     try:
-        print("🚀 جاري معالجة الصورة... (إيلا كانت أول مرة، غادي يتسنى يتيليشارجي الموديل)")
+        # إشعار للمستخدم ببدء الخدمة
+        msg = bot.reply_to(message, "جاري تنقية الصورة... انتظر لحظة ⏳")
         
-        # 2. فتح الصورة
-        with open(input_file, 'rb') as i:
-            input_data = i.read()
-            
-            # 3. إزالة الخلفية بالذكاء الاصطناعي
-            output_data = remove(input_data)
-            
-            # 4. حفظ النتيجة
-            with open(output_file, 'wb') as o:
-                o.write(output_data)
+        # تحميل الصورة
+        file_info = bot.get_file(message.photo[-1].file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
         
-        print(f"✅ ناضي! الصورة تنقات وتحفظات سميتها: {output_file}")
-        print("🔗 تقدر دابا تفتح الدوسي وتشوف النتيجة.")
-
+        # معالجة الصورة بالذكاء الاصطناعي
+        input_image = Image.open(io.BytesIO(downloaded_file))
+        output_image = remove(input_image)
+        
+        # تحويل النتيجة لملف جاهز للإرسال
+        img_byte_arr = io.BytesIO()
+        output_image.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        
+        # إرسال النتيجة كملف (Document) باش تبقى الجودة عالية
+        bot.send_document(message.chat.id, img_byte_arr, visible_file_name='no-bg-jamal.png')
+        bot.delete_message(message.chat.id, msg.message_id)
+        
     except Exception as e:
-        print(f"❌ وقع مشكل تقني: {e}")
+        bot.reply_to(message, "وقع مشكل تقني، جرب صورة أخرى.")
+        print(f"Error: {e}")
 
-# تشغيل المحرك
+# هاد الجزء ضروري لـ Render باش ما يسدش السيرفر
 if __name__ == "__main__":
-    start_engine()
+    print("البوت خدام دابا... صيفط ليه تصويرة!")
+    bot.infinity_polling()
